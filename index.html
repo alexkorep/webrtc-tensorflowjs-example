@@ -8,11 +8,25 @@
         .then(function (model) {
           console.log(model)
           const webrtcElement = document.getElementById("gum-local");
-          window.requestAnimationFrame(onFrame.bind(null, model, webrtcElement));
+
+          const canvas = document.createElement('canvas');
+          canvas.width = 224;
+          canvas.height = 224;
+          //document.body.appendChild(canvas)
+
+          window.requestAnimationFrame(onFrame.bind(null, model, webrtcElement, canvas));
         })
 
-      function onFrame(model, webrtcElement) {
-        const tensor = tf.fromPixels(webrtcElement);
+      const VIDEO_WIDTH = 640
+      const VIDEO_HEIGHT = 480
+      const NET_SIZE = 224
+
+      function onFrame(model, webrtcElement, canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(webrtcElement, 0, 0, VIDEO_WIDTH, VIDEO_HEIGHT, 0, 0, NET_SIZE, NET_SIZE);
+
+        //const tensor = tf.fromPixels(webrtcElement);
+        const tensor = tf.fromPixels(canvas);
         const eTensor = tensor.expandDims(0).asType('float32').div(256.0);
         const pred = model.predict(eTensor);
         max = tf.argMax(pred, 1)
@@ -21,24 +35,12 @@
         const predArray = Array.from(predValues);
         meanScore = calcMeanScore(predArray)
 
-        const index = max.get([0])
         const labelElement = document.getElementById("label");
-        labelElement.innerHTML = index + ' | ' + meanScore
-        window.requestAnimationFrame(onFrame.bind(null, model, webrtcElement));
+        labelElement.innerHTML = meanScore.toFixed(2)
+        window.requestAnimationFrame(onFrame.bind(null, model, webrtcElement, canvas));
       }
-
-      function normalizeLabels(labels) {
-        const arrSum = labels.reduce((a, b) => a + b, 0)
-        return labels.map(a => a/arrSum)
-        // labels_np = np.array(labels)
-        // return labels_np / labels_np.sum()
-      }
-
 
       function calcMeanScore(scoreDist) {
-        // scoreDist = normalizeLabels(scoreDist)
-        // //return (scoreDist*55).sum()
-        // return scoreDist.reduce((a, b) => a + b, 0) * 55
         let result = 0
         for (let i = 1; i <= 10; i++) {
           result += i*scoreDist[i - 1]
@@ -50,16 +52,9 @@
       /////////////////
       // WEBRTC
 
-      // Put variables in global scope to make them available to the browser console.
-      const constraints = window.constraints = {
-        audio: false,
-        video: true
-      };
-
       function handleSuccess(stream) {
         const video = document.querySelector('video');
         const videoTracks = stream.getVideoTracks();
-        console.log('Got stream with constraints:', constraints);
         console.log(`Using video device: ${videoTracks[0].label}`);
         window.stream = stream; // make variable available to browser console
         video.srcObject = stream;
@@ -67,8 +62,7 @@
 
       function handleError(error) {
         if (error.name === 'ConstraintNotSatisfiedError') {
-          let v = constraints.video;
-          errorMsg(`The resolution ${v.width.exact}x${v.height.exact} px is not supported by your device.`);
+          errorMsg(`The resolution is not supported by your device.`);
         } else if (error.name === 'PermissionDeniedError') {
           errorMsg('Permissions have not been granted to use your camera and ' +
             'microphone, you need to allow the page access to your devices in ' +
@@ -85,16 +79,36 @@
         }
       }
 
-      navigator.mediaDevices
-        .getUserMedia(constraints)
-        .then(handleSuccess)
-        .catch(handleError);
+      function initCamera(front) {
+        var constraints = {
+          video: {
+            facingMode: (front? "user" : "environment")
+          },
+          audio: false
+        }
+
+        navigator.mediaDevices
+          .getUserMedia(constraints)
+          .then(handleSuccess)
+          .catch(handleError);
+      }
+
+
+      let front = false;
+      initCamera(front)
+
     </script>
   </head>
 
-  <body>
-      <video id="gum-local" width="224" height="224" autoplay playsinline></video>
-      <div id="label"></div>
+  <body style='font-size: 64pt;'>
+      <video id="gum-local" width="100%" height="100%" autoplay playsinline style='position: absolute;'></video>
+      <div id="label" style='text-align: center;'>Loading network, please wait...</div>
       <div id="errorMsg"></div>
   </body>
+  <script>
+    document.getElementById('gum-local').onclick = () => {
+      front = !front;
+      initCamera(front)
+    };
+  </script>
 </html>
