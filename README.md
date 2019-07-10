@@ -2,6 +2,12 @@
 
 Example of WebRTC video stream image recognition in browser with TensorFlow.js
 
+# Online demo
+
+[Online demo](https://alexkorep.github.io/webrtc-tensorflowjs-example/)
+
+# Screenshots
+
 ![Tennis ball](tensorflowjs-ball.png)
 
 ![Water bottle](tebserflowjs-waterbottle.png)
